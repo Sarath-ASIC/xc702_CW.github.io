@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zynq / AXI Accelerator Terminal</title>
+<style>
+:root{--bg:#0c0d0f;--p1:#15171a;--p2:#1b1e22;--bd:#33373d;--bd2:#464b53;--tx:#d4d7dc;--mu:#868c96;
+--am:#d9a13a;--te:#4fb3a3;--rd:#d86a63;--bl:#8f9cc2;--mono:ui-monospace,"Cascadia Code",Consolas,Menlo,monospace;
+--sans:"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--tx);font:13px/1.4 var(--sans);display:grid;grid-template-rows:auto auto 1fr;min-height:0}
+button,input,select{font:inherit;color:inherit}
+button{background:var(--p2);border:1px solid var(--bd2);padding:5px 11px;cursor:pointer;border-radius:2px}
+button:hover:not(:disabled){border-color:var(--am);color:#fff}
+button.pri{border-color:var(--am);color:var(--am)}
+button:disabled{opacity:.4;cursor:not-allowed}
+:focus-visible{outline:1px solid var(--am);outline-offset:1px}
+input,select{background:#0f1113;border:1px solid var(--bd2);padding:4px 7px;border-radius:2px}
+input:focus,select:focus{border-color:var(--am);outline:none}
+/* connection bar */
+#bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;padding:8px 12px;background:var(--p1);border-bottom:1px solid var(--bd)}
+#bar h1{font-size:13px;font-weight:600;letter-spacing:.08em;margin:0 8px 0 0}
+.st{font:600 12px var(--mono);padding:3px 8px;border:1px solid var(--bd2);display:inline-flex;gap:6px;align-items:center}
+.st i{width:7px;height:7px;border-radius:50%;background:var(--mu)}
+.st[data-s=CONNECTED]{color:var(--te);border-color:var(--te)}.st[data-s=CONNECTED] i{background:var(--te)}
+.st[data-s=CONNECTING]{color:var(--am);border-color:var(--am)}.st[data-s=CONNECTING] i{background:var(--am)}
+.st[data-s=ERROR]{color:var(--rd);border-color:var(--rd)}.st[data-s=ERROR] i{background:var(--rd)}
+#portinfo{color:var(--mu);font:12px var(--mono)}
+#bar label{color:var(--mu);display:flex;gap:6px;align-items:center}
+#baud{width:92px;font-family:var(--mono)}
+#notice{padding:6px 12px;color:var(--mu);border-bottom:1px solid var(--bd);font-size:12px}
+#notice.warn{color:var(--rd)}
+/* main */
+main{display:grid;grid-template-columns:minmax(0,1fr) 350px;min-height:0}
+section{min-height:0;display:flex;flex-direction:column}
+#termwrap{border-right:1px solid var(--bd)}
+.hd{display:flex;align-items:center;gap:10px;padding:6px 12px;background:var(--p1);border-bottom:1px solid var(--bd);color:var(--mu);font-weight:600}
+.hd .sp{flex:1}
+.led{font:600 10px var(--mono);padding:1px 5px;border:1px solid var(--bd);color:var(--bd2)}
+.led.on{color:var(--am);border-color:var(--am)}
+#pend{font:12px var(--mono);color:var(--am);min-width:12ch;text-align:right}
+#out{flex:1;overflow:auto;padding:8px 12px;background:#08090a;font:12.5px/1.5 var(--mono);min-height:0}
+.ln{display:flex;gap:10px;white-space:pre-wrap;word-break:break-all}
+.ts{color:#555b64;flex:none}.tag{flex:none;width:3ch;color:#6a707a}
+.tx .msg{color:var(--am)}.rx .msg{color:var(--tx)}.ok .msg{color:var(--te)}.err .msg,.err .tag{color:var(--rd)}
+.evt .msg,.evt .tag{color:var(--bl)}.info .msg{color:var(--mu)}
+#cmd{display:flex;align-items:center;gap:8px;padding:7px 12px;border-top:1px solid var(--bd);background:var(--p1)}
+#cmd span{font:600 13px var(--mono);color:var(--am)}
+#cin{flex:1;font:13px var(--mono);background:#08090a}
+/* control panel */
+#ctl{overflow:auto;background:var(--p1)}
+.blk{padding:10px 12px;border-bottom:1px solid var(--bd)}
+.blk h2{margin:0 0 8px;font-size:12px;font-weight:600;color:var(--mu)}
+.mat{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.mat label{display:flex;flex-direction:column;gap:2px;font:11px var(--mono);color:var(--mu)}
+.mat input{width:100%;font:13px var(--mono);text-align:right}
+.mat input.bad{border-color:var(--rd);color:var(--rd)}
+.msgline{min-height:16px;font-size:11px;color:var(--rd);margin:4px 0}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+.cm{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.cm div{border:1px solid var(--bd);background:#0f1113;padding:4px 8px;font-family:var(--mono)}
+.cm small{display:block;color:var(--mu);font-size:11px}
+.cm b{font-weight:600;font-size:15px;color:var(--te)}
+.cm.sw b{color:var(--mu);font-size:13px}
+.cm.stale b{color:#555b64}
+#cmp{font:12px var(--mono);margin-top:6px;min-height:16px}
+dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:12px}
+dt{color:var(--mu)}dd{margin:0;font-family:var(--mono);overflow-wrap:anywhere}
+details{padding:8px 12px;color:var(--mu);font-size:12px}
+summary{cursor:pointer}
+table{border-collapse:collapse;margin:8px 0;font:11.5px var(--mono);width:100%}
+td,th{border:1px solid var(--bd);padding:2px 6px;text-align:left}
+details p{margin:6px 0}
+@media(max-width:900px){body{display:block;height:auto}main{display:block}#termwrap{border-right:0;height:65vh}}
+@media(prefers-reduced-motion:no-preference){.led{transition:color .1s,border-color .1s}}
+</style>
+</head>
+<body>
+
+<header id="bar">
+  <h1>ZYNQ / AXI ACCELERATOR TERMINAL</h1>
+  <span class="st" id="st" data-s="DISCONNECTED"><i></i><span id="stt">DISCONNECTED</span></span>
+  <button id="bconn" class="pri">Connect</button>
+  <button id="bdisc" disabled>Disconnect</button>
+  <label>Baud <input id="baud" type="number" value="115200" min="300" step="1" list="bauds" title="Data format fixed at 8-N-1, no flow control"></label>
+  <datalist id="bauds"><option value="9600"><option value="38400"><option value="57600"><option value="115200"><option value="230400"><option value="460800"><option value="921600"></datalist>
+  <span id="portinfo"></span>
+</header>
+<div id="notice">Requires a Chromium desktop browser (Chrome/Edge) in a secure context, the ZC702 USB-UART (J17) connected and not held by another program, and ARM firmware implementing the serial protocol below. Nothing is simulated.</div>
+
+<main>
+  <section id="termwrap" aria-label="Terminal">
+    <div class="hd">Terminal<span class="sp"></span><span id="pend"></span><span class="led" id="ltx">TX</span><span class="led" id="lrx">RX</span><button id="bclr" title="Ctrl+L">Clear</button></div>
+    <div id="out" role="log" aria-live="off"></div>
+    <div id="cmd"><span>zynq&gt;</span><input id="cin" autocomplete="off" spellcheck="false" aria-label="Command" disabled placeholder="Connect to send commands"><button id="bsend" disabled>Send</button></div>
+  </section>
+
+  <section id="ctl" aria-label="Accelerator control">
+    <div class="blk"><h2>Matrix A (int16)</h2><div class="mat" id="ma"></div><div class="msgline" id="ea"></div>
+      <div class="row"><button id="bsa" disabled>Send Matrix A</button></div></div>
+    <div class="blk"><h2>Matrix B (int16)</h2><div class="mat" id="mb"></div><div class="msgline" id="eb"></div>
+      <div class="row"><button id="bsb" disabled>Send Matrix B</button></div></div>
+    <div class="blk"><div class="row"><button id="brun" class="pri" disabled>Run Multiplication</button><button id="brd" disabled>Read Results</button><button id="bst" disabled>Read Status</button></div></div>
+    <div class="blk"><h2>C = A × B (hardware, int32)</h2>
+      <div class="cm" id="cm"></div><div id="cmp"></div>
+      <h2 style="margin-top:10px">EXPECTED SOFTWARE RESULT</h2><div class="cm sw" id="sw"></div></div>
+    <div class="blk"><h2>Hardware status</h2><dl>
+      <dt>Connection</dt><dd id="s-conn">DISCONNECTED</dd><dt>Busy</dt><dd id="s-busy">unknown</dd><dt>Done</dt><dd id="s-done">unknown</dd>
+      <dt>Last operation</dt><dd id="s-op">none</dd><dt>Last error</dt><dd id="s-err">none</dd></dl></div>
+    <details><summary>Protocol and register map</summary>
+      <p>Newline-terminated ASCII. GUI → firmware: PING, HELP, STATUS, SET_A a00 a01 a10 a11, SET_B b00 b01 b10 b11, RUN, READ. Firmware → GUI: OK PONG | OK HELP … | OK STATUS BUSY=x DONE=x | OK A | OK B | OK STARTED | EVENT DONE | OK C c00 c01 c10 c11 | ERR msg.</p>
+      <p>The browser never touches AXI. ARM firmware maps commands to registers at 0x43C00000:</p>
+      <table><tr><th>Offset</th><th>Register</th></tr><tr><td>0x00–0x0C</td><td>A00 A01 A10 A11</td></tr><tr><td>0x10–0x1C</td><td>B00 B01 B10 B11</td></tr><tr><td>0x20</td><td>CONTROL (bit0 = start)</td></tr><tr><td>0x24</td><td>STATUS (bit0 DONE, bit1 BUSY)</td></tr><tr><td>0x28–0x34</td><td>C00 C01 C10 C11</td></tr></table>
+    </details>
+  </section>
+</main>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+
+/* ---------- Terminal rendering (textContent only: no HTML injection) ---------- */
+const Term = (() => {
+  const out = $('out'), MAX = 20000, TAG = {tx:'TX', rx:'RX', ok:'RX', err:'ERR', evt:'EVT', info:'SYS'};
+  const p = (n, l = 2) => String(n).padStart(l, '0');
+  function log(kind, text) {
+    const near = out.scrollHeight - out.scrollTop - out.clientHeight < 40; // follow only if already at bottom
+    const d = new Date(), row = document.createElement('div');
+    row.className = 'ln ' + kind;
+    for (const [c, t] of [['ts', `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`], ['tag', TAG[kind]], ['msg', text]]) {
+      const s = document.createElement('span'); s.className = c; s.textContent = t; row.append(s);
+    }
+    out.append(row);
+    while (out.childElementCount > MAX) out.firstChild.remove();
+    if (near) out.scrollTop = out.scrollHeight;
+  }
+  return { log, clear: () => { out.replaceChildren(); } };
+})();
+
+/* ---------- Serial connection management (Web Serial) ---------- */
+const Serial = (() => {
+  const enc = new TextEncoder(), dec = new TextDecoder();
+  let port = null, reader = null, writer = null, loop = null, closing = false;
+  const cb = { data(){}, nonfatal(){}, lost(){}, tx(){} };
+
+  async function readLoop(p) {
+    while (p.readable && !closing) {            // readable becomes null after a fatal error (e.g. unplug)
+      reader = p.readable.getReader();
+      try {
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (value && value.length) cb.data(dec.decode(value, { stream: true }));
+        }
+      } catch (e) { if (!closing) cb.nonfatal(e); }   // break/framing/parity/overrun: port stays usable
+      finally { reader.releaseLock(); reader = null; }
+    }
+    if (!closing) cb.lost();
+  }
+  async function connect(baudRate) {
+    const p = await navigator.serial.requestPort();   // must follow a user gesture
+    await p.open({ baudRate, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' });
+    port = p; writer = p.writable.getWriter(); closing = false;
+    loop = readLoop(p);
+    return p;
+  }
+  async function disconnect() {
+    closing = true;
+    try { await reader?.cancel(); } catch {}
+    try { await loop; } catch {}
+    try { writer?.releaseLock(); } catch {}
+    try { await port?.close(); } catch {}
+    port = writer = reader = loop = null;
+  }
+  async function write(s) { cb.tx(); await writer.write(enc.encode(s)); }
+  return { connect, disconnect, write, cb, get open() { return !!port && !closing; }, get port() { return port; } };
+})();
+
+/* ---------- Protocol layer: the only place that knows command/response syntax ---------- */
+const Protocol = (() => {
+  const I16 = [-32768, 32767], I32 = [-2147483648, 2147483647];
+  const isInt = (s, [lo, hi]) => /^[+-]?\d+$/.test(s) && +s >= lo && +s <= hi;
+  const SPEC = {
+    PING:   { argc: 0, re: /^OK PONG$/ },
+    HELP:   { argc: 0, re: /^OK HELP\b/ },
+    STATUS: { argc: 0, re: /^OK STATUS BUSY=([01]) DONE=([01])$/ },
+    SET_A:  { argc: 4, i16: true, re: /^OK A$/ },
+    SET_B:  { argc: 4, i16: true, re: /^OK B$/ },
+    RUN:    { argc: 0, re: /^OK STARTED$/ },
+    READ:   { argc: 0, re: /^OK C (-?\d+) (-?\d+) (-?\d+) (-?\d+)$/, check: m => m.slice(1).every(v => isInt(v, I32)) },
+  };
+  const UNKNOWN = { re: /^OK\b/ };          // unknown verb: sent verbatim, any OK line completes it
+  const TIMEOUT_MS = 2000;
+  let pending = null, buf = '';
+  const hooks = { pending(){}, event(){} };
+  const fail = (err, logged) => { if (!pending) return; clearTimeout(pending.timer); const pd = pending; pending = null; err.logged = logged; hooks.pending(null); pd.reject(err); };
+
+  function exec(text) {
+    const fail0 = m => Promise.reject(new Error(m));
+    if (!Serial.open) return fail0('Not connected.');
+    if (pending) return fail0(`Command ${pending.verb} still pending.`);
+    const tok = text.trim().split(/\s+/).filter(Boolean);
+    if (!tok.length) return fail0('Empty command.');
+    const verb = tok[0].toUpperCase(), args = tok.slice(1), spec = SPEC[verb];
+    let line = text.trim();
+    if (spec) {
+      if (args.length !== spec.argc) return fail0(`${verb} takes ${spec.argc} argument(s), got ${args.length}.`);
+      if (spec.i16 && !args.every(a => isInt(a, I16))) return fail0(`${verb} operands must be integers in -32768..32767.`);
+      line = [verb, ...args.map(a => String(parseInt(a, 10)))].join(' ');
+    } else Term.log('info', `${verb} is not in the protocol contract; sent verbatim.`);
+    return new Promise((resolve, reject) => {
+      pending = { verb, spec: spec || UNKNOWN, args, resolve, reject, timer: setTimeout(() => {
+        Term.log('err', `Timeout: no valid response to ${verb} within ${TIMEOUT_MS} ms.`);
+        fail(new Error(`Timeout waiting for ${verb} response.`), true);
+      }, TIMEOUT_MS) };
+      hooks.pending(verb);
+      Term.log('tx', line);
+      Serial.write(line + '\n').catch(e => { Term.log('err', 'Write failed: ' + e.message); fail(new Error('Write failed: ' + e.message), true); });
+    });
+  }
+  function onLine(raw) {
+    const line = raw.replace(/\r$/, '');
+    if (!line.trim()) return;
+    if (/^EVENT\b/.test(line)) { Term.log('evt', line); hooks.event(line); return; }   // asynchronous, never completes a command
+    if (!pending) { Term.log('rx', line); return; }                                    // unsolicited text: shown, never trusted
+    if (/^ERR\b/.test(line)) { Term.log('err', line); fail(new Error(line.slice(3).trim() || 'Device reported an error.'), true); return; }
+    const m = pending.spec.re.exec(line);
+    if (m && (!pending.spec.check || pending.spec.check(m))) {
+      Term.log('ok', line); clearTimeout(pending.timer);
+      const pd = pending; pending = null; hooks.pending(null); pd.resolve({ verb: pd.verb, args: pd.args, m, line }); return;
+    }
+    if (/^OK\b/.test(line)) { Term.log('err', line); fail(new Error(`Malformed response to ${pending.verb}.`), false); return; }
+    Term.log('rx', line);   // unrelated output (e.g. firmware debug print): keep waiting until timeout
+  }
+  function feed(chunk) {     // incremental framing: partial lines are buffered, multiple lines split
+    buf += chunk;
+    let i;
+    while ((i = buf.indexOf('\n')) >= 0) { const l = buf.slice(0, i); buf = buf.slice(i + 1); onLine(l); }
+    if (buf.length > 4096) { Term.log('err', 'Received 4096 bytes without a newline; buffer discarded.'); buf = ''; }
+  }
+  return { exec, feed, hooks, abort(msg) { fail(new Error(msg), false); buf = ''; }, get busy() { return !!pending; } };
+})();
+
+/* ---------- Application state + UI ---------- */
+const App = (() => {
+  const S = { conn: 'DISCONNECTED', busy: null, done: null, op: 'none', err: 'none', a: null, b: null, c: null, exp: null, doneSeen: false, doneTimer: null };
+  const N = ['00', '01', '10', '11'];
+  const inA = N.map(n => mkIn('ma', 'a' + n)), inB = N.map(n => mkIn('mb', 'b' + n));
+  function mkIn(host, id) {
+    const l = document.createElement('label'), i = document.createElement('input');
+    i.id = id; i.value = '0'; i.inputMode = 'numeric'; i.autocomplete = 'off';
+    l.append(id.toUpperCase(), i); $(host).append(l); return i;
+  }
+  const cells = (host, ids) => ids.map(n => { const d = document.createElement('div'); d.innerHTML = `<small>${'C' + n}</small><b>—</b>`; $(host).append(d); return d.lastChild; });
+  const cOut = cells('cm', N), sOut = cells('sw', N);
+
+  const validate = ins => ins.map(i => { const ok = /^-?\d+$/.test(i.value.trim()) && +i.value >= -32768 && +i.value <= 32767; i.classList.toggle('bad', !ok); return ok; }).every(Boolean);
+  function refresh() {
+    const okA = validate(inA), okB = validate(inB), live = S.conn === 'CONNECTED', free = live && !Protocol.busy;
+    $('ea').textContent = okA ? '' : 'Integers from -32768 to 32767 only.';
+    $('eb').textContent = okB ? '' : 'Integers from -32768 to 32767 only.';
+    $('bsa').disabled = !(free && okA); $('bsb').disabled = !(free && okB);
+    for (const id of ['brun', 'brd', 'bst']) $(id).disabled = !free;
+    $('bsend').disabled = !live; $('cin').disabled = !live;
+    $('cin').placeholder = live ? 'PING, HELP, STATUS, SET_A …' : 'Connect to send commands';
+    $('bconn').disabled = !('serial' in navigator) || S.conn === 'CONNECTING' || live;
+    $('bdisc').disabled = !(live || S.conn === 'ERROR');
+    $('baud').disabled = live || S.conn === 'CONNECTING';
+    $('s-conn').textContent = $('stt').textContent = S.conn; $('st').dataset.s = S.conn;
+    $('s-busy').textContent = S.busy === null ? 'unknown' : S.busy ? 'YES' : 'no';
+    $('s-done').textContent = S.done === null ? 'unknown' : S.done ? 'YES' : 'no';
+    $('s-op').textContent = S.op; $('s-err').textContent = S.err;
+    $('s-err').style.color = S.err === 'none' ? '' : 'var(--rd)';
+    cOut.forEach((b, i) => b.textContent = S.c ? S.c[i] : '—');
+    sOut.forEach((b, i) => b.textContent = S.exp ? S.exp[i] : '—');
+    const cmp = $('cmp');
+    if (S.c && S.exp) { const eq = S.c.every((v, i) => v === S.exp[i]); cmp.textContent = eq ? 'Hardware matches expected software result.' : 'MISMATCH: hardware differs from expected software result.'; cmp.style.color = eq ? 'var(--te)' : 'var(--rd)'; }
+    else { cmp.textContent = S.c ? 'No expected result: A and B were not both sent in this session.' : ''; cmp.style.color = 'var(--mu)'; }
+  }
+  function setConn(s, err) { S.conn = s; if (err) S.err = err; if (s !== 'CONNECTED') { S.busy = S.done = null; } refresh(); }
+
+  const vals = ins => ins.map(i => parseInt(i.value, 10));
+  function expected(a, b) {   // software reference only; int32 wrap emulated with |0
+    return [a[0]*b[0] + a[1]*b[2], a[0]*b[1] + a[1]*b[3], a[2]*b[0] + a[3]*b[2], a[2]*b[1] + a[3]*b[3]].map(x => x | 0);
+  }
+  const clearDoneTimer = () => { clearTimeout(S.doneTimer); S.doneTimer = null; };
+
+  function apply(r) {   // update state only from a validated response
+    const { verb, m, args } = r;
+    S.err = 'none';
+    switch (verb) {
+      case 'STATUS': S.busy = +m[1]; S.done = +m[2]; S.op = `STATUS: BUSY=${m[1]} DONE=${m[2]}`; break;
+      case 'SET_A': S.a = args.map(Number); S.op = 'Matrix A written (OK A)'; break;
+      case 'SET_B': S.b = args.map(Number); S.op = 'Matrix B written (OK B)'; break;
+      case 'RUN':
+        S.op = 'RUN started (OK STARTED); waiting for EVENT DONE';
+        S.busy = S.done = null;
+        if (!S.doneSeen) S.doneTimer = setTimeout(() => { S.err = 'No EVENT DONE within 5 s. Use Read Status to check.'; Term.log('err', S.err); S.op = 'RUN: completion not confirmed'; refresh(); }, 5000);
+        break;
+      case 'READ': S.c = m.slice(1).map(Number); S.exp = S.a && S.b ? expected(S.a, S.b) : null; S.op = 'Results read (OK C)'; break;
+      default: S.op = `${verb}: ${r.line}`;
+    }
+  }
+  async function run(text) {
+    const verb = text.trim().split(/\s+/)[0]?.toUpperCase();
+    if (verb === 'RUN') { S.doneSeen = false; clearDoneTimer(); }
+    try { apply(await Protocol.exec(text)); }
+    catch (e) {
+      S.err = e.message; S.op = `${verb || 'command'} failed`;
+      if (!e.logged) Term.log('err', e.message);
+      if (verb === 'RUN') clearDoneTimer();
+    }
+    refresh();
+  }
+  Protocol.hooks.pending = v => { $('pend').textContent = v ? `PENDING ${v}…` : ''; refresh(); };
+  Protocol.hooks.event = line => {
+    if (/^EVENT DONE$/.test(line)) { S.doneSeen = true; clearDoneTimer(); S.done = 1; S.busy = 0; S.err = 'none'; S.op = 'RUN completed (EVENT DONE)'; }
+    else S.op = line;
+    refresh();
+  };
+
+  /* LEDs */
+  const flash = id => { const e = $(id); e.classList.add('on'); clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove('on'), 120); };
+  Serial.cb.tx = () => flash('ltx');
+  Serial.cb.data = c => { flash('lrx'); Protocol.feed(c); };
+  Serial.cb.nonfatal = e => { Term.log('err', `Serial read error (${e.name}): ${e.message}`); S.err = `Read error: ${e.name}`; refresh(); };
+  Serial.cb.lost = async () => {
+    Protocol.abort('Device disconnected.'); clearDoneTimer(); await Serial.disconnect();
+    Term.log('err', 'Serial device disconnected or read stream failed.'); $('portinfo').textContent = '';
+    setConn('ERROR', 'Device disconnected.');
+  };
+
+  async function connect() {
+    const baud = parseInt($('baud').value, 10);
+    if (!(baud >= 300)) { Term.log('err', 'Invalid baud rate.'); return; }
+    setConn('CONNECTING');
+    try {
+      const p = await Serial.connect(baud), i = p.getInfo ? p.getInfo() : {}, h = n => n.toString(16).toUpperCase().padStart(4, '0');
+      $('portinfo').textContent = i.usbVendorId !== undefined ? `USB ${h(i.usbVendorId)}:${h(i.usbProductId)} · ${baud} 8N1` : `${baud} 8N1`;
+      Term.log('info', `Port opened at ${baud} baud, 8-N-1. Firmware replies are not assumed; use PING to verify.`);
+      S.err = 'none'; setConn('CONNECTED'); $('cin').focus();
+    } catch (e) {
+      if (e.name === 'NotFoundError') { Term.log('info', 'Port selection cancelled.'); setConn('DISCONNECTED'); }
+      else {
+        const hint = /NetworkError|InvalidState/.test(e.name) ? ' Port may be in use by another program (Vitis/PuTTY/other tab) or unplugged.' : '';
+        Term.log('err', `Connect failed (${e.name}): ${e.message}.${hint}`); setConn('ERROR', `${e.name}: ${e.message}`);
+      }
+    }
+  }
+  async function disconnect() {
+    Protocol.abort('Disconnected.'); clearDoneTimer(); await Serial.disconnect();
+    $('portinfo').textContent = ''; Term.log('info', 'Port closed.'); S.err = 'none'; setConn('DISCONNECTED');
+  }
+
+  /* terminal input with history */
+  const hist = []; let hi = 0, draft = '';
+  function submit() {
+    const t = $('cin').value.trim(); if (!t) return;
+    if (Protocol.busy) { Term.log('err', 'A command is still pending; wait for its response.'); return; }
+    if (hist[hist.length - 1] !== t) hist.push(t);
+    hi = hist.length; $('cin').value = ''; run(t);
+  }
+  $('cin').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); submit(); }
+    else if (e.key === 'ArrowUp' && hist.length) { e.preventDefault(); if (hi === hist.length) draft = $('cin').value; if (hi > 0) hi--; $('cin').value = hist[hi]; }
+    else if (e.key === 'ArrowDown' && hi < hist.length) { e.preventDefault(); hi++; $('cin').value = hi === hist.length ? draft : hist[hi]; }
+  });
+  document.addEventListener('keydown', e => { if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'l') { e.preventDefault(); Term.clear(); } });
+
+  $('bconn').onclick = connect; $('bdisc').onclick = disconnect; $('bclr').onclick = Term.clear; $('bsend').onclick = submit;
+  $('bsa').onclick = () => run('SET_A ' + vals(inA).join(' '));
+  $('bsb').onclick = () => run('SET_B ' + vals(inB).join(' '));
+  $('brun').onclick = () => run('RUN'); $('brd').onclick = () => run('READ'); $('bst').onclick = () => run('STATUS');
+  [...inA, ...inB].forEach(i => i.addEventListener('input', refresh));
+
+  if ('serial' in navigator) {
+    navigator.serial.addEventListener('disconnect', e => { if (e.target === Serial.port) Serial.cb.lost(); });
+    Term.log('info', 'Ready. Press Connect and choose the ZC702 USB-UART port.');
+  } else {
+    const n = $('notice'); n.className = 'warn';
+    n.textContent = 'Web Serial API unavailable. Use desktop Chrome or Edge' + (window.isSecureContext ? '.' : ' over HTTPS, http://localhost or file://.') + ' Hardware communication is disabled.';
+    Term.log('err', 'navigator.serial is not available in this browser or context.');
+  }
+  refresh();
+})();
+</script>
+</body>
+</html>
